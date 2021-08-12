@@ -47,3 +47,4 @@ Data/muid.e00
 Code/.ipynb_checkpoints/*
 *.ipynb_checkpoints/*
 .Rproj.user
+.Rhistory
