@@ -96,7 +96,7 @@ ggplot(jsko_all_states, aes(x = State, y = NearestFlowlineDistance_m)) +
 
 # Depletion calculation for each gage
 
-```{r, message = F, warning = F}
+```{r echo = T, message = F, warning = F}
 ## loop through all gages
 # can we subset this? are we using all gages?
 for (usgs_id in aquifer_params$GAGE_ID){
@@ -173,7 +173,7 @@ for (usgs_id in aquifer_params$GAGE_ID){
   #  write_csv(file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_Daily.csv")))
   
   ## status update
-  print(paste0(which(aquifer_params$GAGE_ID == usgs_id), " complete, ", Sys.time()))
+  # print(paste0(which(aquifer_params$GAGE_ID == usgs_id), " complete, ", Sys.time()))
 }
 
 ## save summary
