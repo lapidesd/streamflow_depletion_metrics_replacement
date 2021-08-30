@@ -29,27 +29,38 @@ library(patchwork)
 n_yrs <- 100
 times <- seq(1, 365*n_yrs, 1)
 
+## load shapefile
+area_thres_km2 <- 10000  # only analyze gages < 10,000 km2
+sf_gages <- 
+  file.path("..", "Data", "gagesII_data_and_subsets", "gagesII.shp") %>% 
+  st_read() %>% 
+  mutate(GAGE_ID = as.numeric(STAID)) %>% 
+  subset(DRAIN_SQKM <= area_thres_km2)
+
 ## load aquifer characteristics
-aquifer_params <- 
-  read_csv(file.path("..", "Data", "GAGESII_aquifer_params.csv")) %>% 
-  unique() %>% 
-  mutate(Tr_m2d = Transmissivity*86400,
-         S = Porosity) # any unit conversions if necessary
+# porosity from GLHYMPS: Porosity = value, GLHYMPS_Shape_Area = area of each porosity value within watershed
+porosity <- 
+  read_csv(file.path("..", "Data", "GLHYMPS_Porosity_by_gauges.csv")) %>% 
+  subset(GAGE_ID %in% sf_gages$STAID)
+
+# calculate area-weighted mean transmissivity and total area
+porosity_gage <-
+  porosity %>% 
+  group_by(GAGE_ID) %>% 
+  summarize(area_m2 = sum(GLHYMPS_Shape_Area),
+            Porosity_weightedAvg = weighted.mean(Porosity, GLHYMPS_Shape_Area)) %>% 
+  mutate(S = Porosity_weightedAvg)  # could apply transformation if desired (i.e., S = 50% of porosity)
+
+# there is a separate transmissivity file for each gage
 
 # plot and inspect
 p_S <-
-  ggplot(aquifer_params, aes(x = S)) +
-  geom_histogram() +
+  ggplot(porosity_gage, aes(x = S)) +
+  geom_histogram(binwidth = 0.01) +
   scale_x_continuous(name = "Storativity [-]") +
   scale_y_continuous(name = "Number of Gages")
+p_S
 
-p_Tr <-
-  ggplot(aquifer_params, aes(x = Tr_m2d)) +
-  geom_histogram() +
-  scale_x_log10(name = "Transmissivity [m2/d]") +
-  scale_y_continuous(name = "Number of Gages")
-
-p_S + p_Tr 
 
 
 ```
@@ -96,9 +107,8 @@ ggplot(jsko_all_states, aes(x = State, y = NearestFlowlineDistance_m)) +
 
 ```{r echo = T, message = F, warning = F}
 ## loop through all gages
-# can we subset this? are we using all gages?
-for (usgs_id in aquifer_params$GAGE_ID){
-  # usgs_id <- "07144780"  # 8-digit USGS gage ID
+for (usgs_id in sf_gages$STAID){
+  # usgs_id <- sf_gages$STAID[1]
   
   ## glover model inputs
   # Well-stream distance [m]
@@ -110,10 +120,13 @@ for (usgs_id in aquifer_params$GAGE_ID){
   # Storativity [-]
   # since GLHYMPS gives porosity, may want to reduce to represent storativity since not all porosity
   # is drainable. however, de Graaf et al. 2015 HESS and 2017 ADWR use these values directly for their models.
-  gage_S  <- aquifer_params$S[aquifer_params$GAGE_ID == usgs_id]
+  gage_S  <- porosity_gage$S[porosity_gage$GAGE_ID == usgs_id]
   
   # Aquifer transmissivity [m2/d]
-  # multiply by 86,400 to convert to m2/d
+  df_Tr_gage <- 
+    file.path("..", "Data", "transmissivity_data", paste0(usgs_id, ".csv")) %>% 
+    read_csv()
+  
   gage_Tr <- aquifer_params$Tr_m2d[aquifer_params$GAGE_ID == usgs_id]
   
   ## calculate depletion
@@ -198,14 +211,6 @@ ggplot(gage_depletion_summary, aes(x = Tr_m2d, y = Qf_100yrs_constant)) +
   theme_bw()
 
 ## make maps
-
-# load shapefile
-sf_gages <- 
-  file.path("..", "Data", "gagesII_data_and_subsets", "gagesII.shp") %>% 
-  st_read() %>% 
-  mutate(GAGE_ID = as.numeric(STAID)) %>% 
-  subset(GAGE_ID %in% gage_depletion_summary$GAGE_ID) %>% 
-  left_join(gage_depletion_summary, by = "GAGE_ID")
 
 # map
 ggplot(sf_gages, aes(color = eq_yrs_constant)) +
