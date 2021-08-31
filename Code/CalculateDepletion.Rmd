@@ -18,6 +18,8 @@ library(lubridate)
 library(tidyverse)
 library(sf)
 library(patchwork)
+options(dplyr.summarise.inform=F)   # suppress summarize info
+
 
 ```
 
@@ -115,11 +117,15 @@ for (usgs_id in sf_gages$STAID){
   # Aquifer transmissivity [m2/d]
   df_Tr_gage <- 
     file.path("..", "Data", "transmissivity_data", paste0(usgs_id, ".csv")) %>% 
-    read_csv() %>% 
+    read_csv(col_types = cols()) %>% 
     subset(complete.cases(.))
   names(df_Tr_gage) <- "Tr_m2d"
   
-  gage_Tr_sample <- sample(df_Tr_gage$Tr_m2d, size = n_iter)
+  if (dim(df_Tr_gage)[1] < n_iter){
+    gage_Tr_sample <- sample(df_Tr_gage$Tr_m2d, size = n_iter, replace = T)
+  } else {
+    gage_Tr_sample <- sample(df_Tr_gage$Tr_m2d, size = n_iter, replace = F)
+  }
   
   ## loop through iterations and calculate depletion
   for (n in 1:n_iter){
@@ -148,17 +154,17 @@ for (usgs_id in sf_gages$STAID){
     
     ## calculate annual depletion
     annual_iter_depletion <- 
-      daily_depletion %>% 
+      daily_iter_depletion %>% 
       dplyr::group_by(iter, year) %>% 
       dplyr::summarize(Qf_constant_sum = sum(Qf_constant),
                        Qf_seasonal_sum = sum(Qf_seasonal))
     
     ## figure out years to dynamic equilibrium
     eq_thres <- 0.01  # 1% change in annual depletion volume
-    prc_change_constant <- c(NA, diff(annual_depletion$Qf_constant_sum))/annual_depletion$Qf_constant_sum
-    prc_change_seasonal <- c(NA, diff(annual_depletion$Qf_seasonal_sum))/annual_depletion$Qf_seasonal_sum
-    eq_yrs_constant <- min(annual_depletion$year[which(prc_change_constant < eq_thres)])
-    eq_yrs_seasonal <- min(annual_depletion$year[which(prc_change_seasonal < eq_thres)])
+    prc_change_constant <- c(NA, diff(annual_iter_depletion$Qf_constant_sum))/annual_iter_depletion$Qf_constant_sum
+    prc_change_seasonal <- c(NA, diff(annual_iter_depletion$Qf_seasonal_sum))/annual_iter_depletion$Qf_seasonal_sum
+    eq_yrs_constant <- min(annual_iter_depletion$year[which(prc_change_constant < eq_thres)])
+    eq_yrs_seasonal <- min(annual_iter_depletion$year[which(prc_change_seasonal < eq_thres)])
   
     ## summarize output data to save
     gage_iter_summary <- tibble(GAGE_ID = usgs_id,
@@ -168,7 +174,7 @@ for (usgs_id in sf_gages$STAID){
                                 Tr_m2d = gage_Tr,
                                 eq_yrs_constant = eq_yrs_constant,
                                 eq_yrs_seasonal = eq_yrs_seasonal,
-                                Qf_100yrs_constant = daily_depletion$Qf_constant[length(times)])
+                                Qf_100yrs_constant = daily_iter_depletion$Qf_constant[length(times)])
           
     ## compile data frame
     if (n == 1){
@@ -188,46 +194,23 @@ for (usgs_id in sf_gages$STAID){
     select(day, Qf_constant, Qf_seasonal) %>% 
     pivot_longer(-day, names_to = "pumping", values_to = "Qf") %>% 
     group_by(day, pumping) %>% 
-    summarize(mean_val = mean(Qf), 
-              sd_val = sd(Qf), 
-              Qfmin = min(Qf),
-              Qf5 = quantile(Qf, probs = .05),
-              Qf25 = quantile(Qf, probs = .25),
-              Qf50 = quantile(Qf, probs = .5),
-              Qf75 = quantile(Qf, probs = .75),
-              Qf95 = quantile(Qf, probs = .95),
-              Qfmax = max(Qf))
+    summarize(Qfmean = round(mean(Qf), 3), 
+              Qfsd = round(sd(Qf), 3), 
+              Qfmin = round(min(Qf), 3),
+              Qf5 = round(quantile(Qf, probs = .05), 3),
+              Qf25 = round(quantile(Qf, probs = .25), 3),
+              Qf50 = round(quantile(Qf, probs = .5), 3),
+              Qf75 = round(quantile(Qf, probs = .75), 3),
+              Qf95 = round(quantile(Qf, probs = .95), 3),
+              Qfmax = round(max(Qf), 3))
   
-  ## compile data frame
-  if (usgs_id == aquifer_params$GAGE_ID[1]){
-    gage_depletion_all <- gage_summary
-    daily_depletion_all <- daily_depletion_summary
-  } else {
-    gage_depletion_all <- bind_rows(gage_depletion_all, gage_summary)
-    daily_depletion_all <- bind_rows(daily_depletion_all, daily_depletion_summary)
-  }
-  
-  ## look at distributions
-  # hist(gage_summary$eq_yrs_constant)
-  # hist(gage_summary$Qf_100yrs_constant)
-  # ggplot(gage_summary, aes(x = Tr_m2d, y = eq_yrs_constant)) + geom_point()
-  
-  ## save daily output - one file per gage
-  ## uncomment if you want to write output
-  #daily_depletion %>% 
-  #  subset(year <= max(c(eq_yrs_constant, eq_yrs_seasonal))) %>% 
-  #  dplyr::select(day, Qf_constant, Qf_seasonal) %>% 
-  #  write_csv(file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_Daily.csv")))
+  ## save output
+  write_csv(daily_depletion_summary, file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_DailySummary.csv")))
+  write_csv(gage_summary, file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_IterationSummary.csv")))
   
   ## status update
   print(paste0(which(sf_gages$STAID == usgs_id), " of ", length(sf_gages$STAID), " complete, ", Sys.time()))
 }
-
-## save summary
-gage_depletion_all %>% 
-  write_csv(file.path("..", "Data", "depletion", "DepletionFraction_EqTime.csv"))
-daily_depletion_all %>% 
-  write_csv(file.path("..", "Data", "depletion", "DailyDepletion_Summary.csv"))
 
 ```
 
