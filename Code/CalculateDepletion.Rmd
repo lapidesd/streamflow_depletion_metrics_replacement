@@ -26,10 +26,14 @@ library(patchwork)
 ```{r}
 
 ## times to test
-n_yrs <- 100
+n_yrs <- 50
 times <- seq(1, 365*n_yrs, 1)
 
-## load shapefile
+# for seasonal pumping, start/stop times
+times_start <- seq(yday(ymd("2021-05-01")), yday(ymd("2021-05-01"))+365*n_yrs, 365)
+times_stop <- seq(yday(ymd("2021-09-30")), yday(ymd("2021-09-30"))+365*n_yrs, 365)
+
+## load gage shapefile
 area_thres_km2 <- 10000  # only analyze gages < 10,000 km2
 sf_gages <- 
   file.path("..", "Data", "gagesII_data_and_subsets", "gagesII.shp") %>% 
@@ -37,31 +41,15 @@ sf_gages <-
   mutate(GAGE_ID = as.numeric(STAID)) %>% 
   subset(DRAIN_SQKM <= area_thres_km2)
 
-## load aquifer characteristics
-# porosity from GLHYMPS: Porosity = value, GLHYMPS_Shape_Area = area of each porosity value within watershed
+## load porosity from GLHYMPS: Porosity = value, GLHYMPS_Shape_Area = area of each porosity value within watershed
+# since GLHYMPS gives porosity, may want to reduce to represent storativity since not all porosity
+# is drainable. however, de Graaf et al. 2015 HESS and 2017 ADWR use these values directly for their models.
 porosity <- 
   read_csv(file.path("..", "Data", "GLHYMPS_Porosity_by_gauges.csv")) %>% 
-  subset(GAGE_ID %in% sf_gages$STAID)
+  subset(GAGE_ID %in% sf_gages$STAID) %>% 
+  mutate(S = Porosity)  # could apply transformation if desired (i.e., S = 50% of porosity)
 
-# calculate area-weighted mean transmissivity and total area
-porosity_gage <-
-  porosity %>% 
-  group_by(GAGE_ID) %>% 
-  summarize(area_m2 = sum(GLHYMPS_Shape_Area),
-            Porosity_weightedAvg = weighted.mean(Porosity, GLHYMPS_Shape_Area)) %>% 
-  mutate(S = Porosity_weightedAvg)  # could apply transformation if desired (i.e., S = 50% of porosity)
-
-# there is a separate transmissivity file for each gage
-
-# plot and inspect
-p_S <-
-  ggplot(porosity_gage, aes(x = S)) +
-  geom_histogram(binwidth = 0.01) +
-  scale_x_continuous(name = "Storativity [-]") +
-  scale_y_continuous(name = "Number of Gages")
-p_S
-
-
+## there is a separate transmissivity file for each gage, load it within loop below
 
 ```
 
@@ -107,74 +95,122 @@ ggplot(jsko_all_states, aes(x = State, y = NearestFlowlineDistance_m)) +
 
 ```{r echo = T, message = F, warning = F}
 ## loop through all gages
+n_iter <- 100   # number of iterations for each gage
 for (usgs_id in sf_gages$STAID){
   # usgs_id <- sf_gages$STAID[1]
   
-  ## glover model inputs
+  ## build glover model inputs for each iteration sample
   # Well-stream distance [m]
   # this is the median well-stream distance from all wells in 12 states with data shared from Jasechko et al.
   # the median of all wells is 318 m. the lowest state median is KY (246 m) and the highest is TX (437 m).
   # could use the data to randomly sample from a distribution for uncertainty analysis.
-  gage_d  <- median_dist_m
+  #   gage_d  <- median_dist_m # constant value everywhere
+  set.seed(1)
+  gage_d_sample <- sample(jsko_all_states$NearestFlowlineDistance_m, size = n_iter)
   
   # Storativity [-]
-  # since GLHYMPS gives porosity, may want to reduce to represent storativity since not all porosity
-  # is drainable. however, de Graaf et al. 2015 HESS and 2017 ADWR use these values directly for their models.
-  gage_S  <- porosity_gage$S[porosity_gage$GAGE_ID == usgs_id]
+  porosity_gage <- subset(porosity, GAGE_ID == usgs_id)
+  gage_S_sample <- sample(porosity_gage$S, size = n_iter, replace = T, prob = porosity_gage$GLHYMPS_Shape_Area)
   
   # Aquifer transmissivity [m2/d]
   df_Tr_gage <- 
     file.path("..", "Data", "transmissivity_data", paste0(usgs_id, ".csv")) %>% 
-    read_csv()
+    read_csv() %>% 
+    subset(complete.cases(.))
+  names(df_Tr_gage) <- "Tr_m2d"
   
-  gage_Tr <- aquifer_params$Tr_m2d[aquifer_params$GAGE_ID == usgs_id]
+  gage_Tr_sample <- sample(df_Tr_gage$Tr_m2d, size = n_iter)
   
-  ## calculate depletion
-  # constant pumping
-  Qf_constant <- glover(t = times, d = gage_d, S = gage_S, Tr = gage_Tr)  # plot(times, Qf_constant)
+  ## loop through iterations and calculate depletion
+  for (n in 1:n_iter){
+    ## get parameters for this sample
+    gage_d <- gage_d_sample[n]
+    gage_S <- gage_S_sample[n]
+    gage_Tr <- gage_Tr_sample[n]
+    
+    ## calculate depletion
+    # constant pumping
+    Qf_constant <- glover(t = times, d = gage_d, S = gage_S, Tr = gage_Tr)
+    # plot(times, Qf_constant)
+    
+    # seasonal pumping (may-sept)
+    Qf_seasonal <- intermittent_pumping(t = times, starts = times_start, stops = times_stop, rates = 1, 
+                                        method = "glover", d = gage_d, S = gage_S, Tr = gage_Tr)
+    # plot(times, Qf_seasonal)
+    
+    ## summarize data
+    daily_iter_depletion <- tibble(iter = n,
+                                   day = times,
+                                   year = rep(seq(1, n_yrs, 1), each = 365),
+                                   DOY = rep(seq(1, 365, 1), times = n_yrs),
+                                   Qf_constant = round(Qf_constant, 3),
+                                   Qf_seasonal = round(Qf_seasonal, 3))
+    
+    ## calculate annual depletion
+    annual_iter_depletion <- 
+      daily_depletion %>% 
+      dplyr::group_by(iter, year) %>% 
+      dplyr::summarize(Qf_constant_sum = sum(Qf_constant),
+                       Qf_seasonal_sum = sum(Qf_seasonal))
+    
+    ## figure out years to dynamic equilibrium
+    eq_thres <- 0.01  # 1% change in annual depletion volume
+    prc_change_constant <- c(NA, diff(annual_depletion$Qf_constant_sum))/annual_depletion$Qf_constant_sum
+    prc_change_seasonal <- c(NA, diff(annual_depletion$Qf_seasonal_sum))/annual_depletion$Qf_seasonal_sum
+    eq_yrs_constant <- min(annual_depletion$year[which(prc_change_constant < eq_thres)])
+    eq_yrs_seasonal <- min(annual_depletion$year[which(prc_change_seasonal < eq_thres)])
   
-  # seasonal pumping (may-sept)
-  times_start <- seq(yday(ymd("2021-05-01")), yday(ymd("2021-05-01"))+365*n_yrs, 365)
-  times_stop <- seq(yday(ymd("2021-09-30")), yday(ymd("2021-09-30"))+365*n_yrs, 365)
-  Qf_seasonal <- intermittent_pumping(t = times, starts = times_start, stops = times_stop, rates = 1, 
-                                      method = "glover", d = gage_d, S = gage_S, Tr = gage_Tr)  # plot(times, Qf_seasonal)
+    ## summarize output data to save
+    gage_iter_summary <- tibble(GAGE_ID = usgs_id,
+                                iter = n,
+                                dist_m = gage_d,
+                                S = gage_S,
+                                Tr_m2d = gage_Tr,
+                                eq_yrs_constant = eq_yrs_constant,
+                                eq_yrs_seasonal = eq_yrs_seasonal,
+                                Qf_100yrs_constant = daily_depletion$Qf_constant[length(times)])
+          
+    ## compile data frame
+    if (n == 1){
+      gage_summary <- gage_iter_summary
+      daily_depletion <- daily_iter_depletion
+      annual_depletion <- annual_iter_depletion
+    } else {
+      gage_summary <- bind_rows(gage_summary, gage_iter_summary)
+      daily_depletion <- bind_rows(daily_depletion, daily_iter_depletion)
+      annual_depletion <- bind_rows(annual_depletion, annual_iter_depletion)
+    }
+  }
   
-  ## summarize data
-  daily_depletion <- tibble(day = times,
-                            year = rep(seq(1, n_yrs, 1), each = 365),
-                            DOY = rep(seq(1, 365, 1), times = n_yrs),
-                            Qf_constant = round(Qf_constant, 3),
-                            Qf_seasonal = round(Qf_seasonal, 3))
-  
-  ## calculate annual depletion
-  annual_depletion <- 
+  ## summarize to timeseries of daily median and stats
+  daily_depletion_summary <-
     daily_depletion %>% 
-    dplyr::group_by(year) %>% 
-    dplyr::summarize(Qf_constant_sum = sum(Qf_constant),
-                     Qf_seasonal_sum = sum(Qf_seasonal))
-  
-  ## figure out years to dynamic equilibrium
-  eq_thres <- 0.01  # 1% change in annual depletion volume
-  prc_change_constant <- c(NA, diff(annual_depletion$Qf_constant_sum))/annual_depletion$Qf_constant_sum
-  prc_change_seasonal <- c(NA, diff(annual_depletion$Qf_seasonal_sum))/annual_depletion$Qf_seasonal_sum
-  eq_yrs_constant <- min(annual_depletion$year[which(prc_change_constant < eq_thres)])
-  eq_yrs_seasonal <- min(annual_depletion$year[which(prc_change_seasonal < eq_thres)])
-  
-  ## summarize output data to save
-  gage_summary <- tibble(GAGE_ID = usgs_id,
-                         dist_m = gage_d,
-                         S = gage_S,
-                         Tr_m2d = gage_Tr,
-                         eq_yrs_constant = eq_yrs_constant,
-                         eq_yrs_seasonal = eq_yrs_seasonal,
-                         Qf_100yrs_constant = daily_depletion$Qf_constant[length(times)])
+    select(day, Qf_constant, Qf_seasonal) %>% 
+    pivot_longer(-day, names_to = "pumping", values_to = "Qf") %>% 
+    group_by(day, pumping) %>% 
+    summarize(mean_val = mean(Qf), 
+              sd_val = sd(Qf), 
+              Qfmin = min(Qf),
+              Qf5 = quantile(Qf, probs = .05),
+              Qf25 = quantile(Qf, probs = .25),
+              Qf50 = quantile(Qf, probs = .5),
+              Qf75 = quantile(Qf, probs = .75),
+              Qf95 = quantile(Qf, probs = .95),
+              Qfmax = max(Qf))
   
   ## compile data frame
   if (usgs_id == aquifer_params$GAGE_ID[1]){
-    gage_depletion_summary <- gage_summary
+    gage_depletion_all <- gage_summary
+    daily_depletion_all <- daily_depletion_summary
   } else {
-    gage_depletion_summary <- bind_rows(gage_depletion_summary, gage_summary)
+    gage_depletion_all <- bind_rows(gage_depletion_all, gage_summary)
+    daily_depletion_all <- bind_rows(daily_depletion_all, daily_depletion_summary)
   }
+  
+  ## look at distributions
+  # hist(gage_summary$eq_yrs_constant)
+  # hist(gage_summary$Qf_100yrs_constant)
+  # ggplot(gage_summary, aes(x = Tr_m2d, y = eq_yrs_constant)) + geom_point()
   
   ## save daily output - one file per gage
   ## uncomment if you want to write output
@@ -184,12 +220,14 @@ for (usgs_id in sf_gages$STAID){
   #  write_csv(file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_Daily.csv")))
   
   ## status update
-  # print(paste0(which(aquifer_params$GAGE_ID == usgs_id), " complete, ", Sys.time()))
+  print(paste0(which(sf_gages$STAID == usgs_id), " of ", length(sf_gages$STAID), " complete, ", Sys.time()))
 }
 
 ## save summary
-gage_depletion_summary %>% 
+gage_depletion_all %>% 
   write_csv(file.path("..", "Data", "depletion", "DepletionFraction_EqTime.csv"))
+daily_depletion_all %>% 
+  write_csv(file.path("..", "Data", "depletion", "DailyDepletion_Summary.csv"))
 
 ```
 
@@ -198,13 +236,13 @@ gage_depletion_summary %>%
 ```{r}
 
 ## inspect and visualize
-ggplot(gage_depletion_summary, aes(x = Tr_m2d, y = eq_yrs_constant)) +
+ggplot(gage_depletion_all, aes(x = Tr_m2d, y = eq_yrs_constant)) +
   geom_point() +
   scale_x_continuous(name = "Transmissivity [m2/d]", trans = "log10") +
   scale_y_continuous(name = "Years to dynamic equilibrium") +
   theme_bw()
 
-ggplot(gage_depletion_summary, aes(x = Tr_m2d, y = Qf_100yrs_constant)) +
+ggplot(gage_depletion_all, aes(x = Tr_m2d, y = Qf_100yrs_constant)) +
   geom_point() +
   scale_x_continuous(name = "Transmissivity [m2/d]", trans = "log10") +
   scale_y_continuous(name = "Depletion fraction (Qf) after 100 yrs") +
@@ -226,8 +264,8 @@ ggplot(sf_gages, aes(color = Qf_100yrs_constant)) +
   theme(legend.position = "bottom")
 
 ## output stats
-sum(gage_depletion_summary$Qf_100yrs_constant < 0.1, na.rm = T)
-sum(gage_depletion_summary$eq_yrs_constant < 50, na.rm = T)
+sum(gage_depletion_all$Qf_100yrs_constant < 0.1, na.rm = T)
+sum(gage_depletion_all$eq_yrs_constant < 50, na.rm = T)
 
 
 ```
