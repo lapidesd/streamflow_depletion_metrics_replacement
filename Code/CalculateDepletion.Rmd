@@ -20,6 +20,8 @@ library(sf)
 library(patchwork)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
+# directory to keep stuff that is too big for GitHub
+dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics/data"
 
 ```
 
@@ -41,7 +43,13 @@ sf_gages <-
   file.path("..", "Data", "gagesII_data_and_subsets", "gagesII.shp") %>% 
   st_read() %>% 
   mutate(GAGE_ID = as.numeric(STAID)) %>% 
-  subset(DRAIN_SQKM <= area_thres_km2)
+  subset(DRAIN_SQKM <= area_thres_km2) %>% 
+  subset(STAID != "15081497" &
+           STAID != "15085100" &
+           STAID != "15261000")  # no transmissivity data
+
+# save final gages used for analysis
+st_write(sf_gages, file.path("..", "Data", "depletion", "Gages_Depletion.gpkg"), append = F)
 
 ## load porosity from GLHYMPS: Porosity = value, GLHYMPS_Shape_Area = area of each porosity value within watershed
 # since GLHYMPS gives porosity, may want to reduce to represent storativity since not all porosity
@@ -130,8 +138,8 @@ for (usgs_id in sf_gages$STAID){
   ## loop through iterations and calculate depletion
   for (n in 1:n_iter){
     ## get parameters for this sample
-    gage_d <- gage_d_sample[n]
-    gage_S <- gage_S_sample[n]
+    gage_d <- round(gage_d_sample[n], 3)
+    gage_S <- round(gage_S_sample[n], 3)
     gage_Tr <- gage_Tr_sample[n]
     
     ## calculate depletion
@@ -203,9 +211,10 @@ for (usgs_id in sf_gages$STAID){
               Qf75 = round(quantile(Qf, probs = .75), 3),
               Qf95 = round(quantile(Qf, probs = .95), 3),
               Qfmax = round(max(Qf), 3))
+  daily_depletion_summary$pumping <- str_sub(daily_depletion_summary$pumping, start = 4)
   
   ## save output
-  write_csv(daily_depletion_summary, file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_DailySummary.csv")))
+  write_csv(daily_depletion_summary, file.path(dir_big_files, paste0("DepletionFraction_", usgs_id, "_DailySummary.csv")))
   write_csv(gage_summary, file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_IterationSummary.csv")))
   
   ## status update
@@ -218,19 +227,116 @@ for (usgs_id in sf_gages$STAID){
 
 ```{r}
 
-## inspect and visualize
-ggplot(gage_depletion_all, aes(x = Tr_m2d, y = eq_yrs_constant)) +
+## load all gages summary stats
+for (i in 1:length(sf_gages$STAID)){
+  usgs_id <- sf_gages$STAID[i]
+  
+  # load data
+  gage_summary <- read_csv(file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_IterationSummary.csv")),
+                           col_types = "cidddiid") %>% 
+    replace_na(list(eq_yrs_constant = Inf, eq_yrs_seasonal = Inf))
+  
+  # compile
+  if (i == 1){
+    all_summary <- gage_summary
+  } else {
+    all_summary <- bind_rows(all_summary, gage_summary)
+  }
+}
+
+## plot all
+p_eq_Tr <- 
+  ggplot(all_summary, aes(y = eq_yrs_constant, x = Tr_m2d)) +
   geom_point() +
   scale_x_continuous(name = "Transmissivity [m2/d]", trans = "log10") +
   scale_y_continuous(name = "Years to dynamic equilibrium") +
   theme_bw()
 
-ggplot(gage_depletion_all, aes(x = Tr_m2d, y = Qf_100yrs_constant)) +
+p_eq_S <- 
+  ggplot(all_summary, aes(y = eq_yrs_constant, x = S)) +
   geom_point() +
-  scale_x_continuous(name = "Transmissivity [m2/d]", trans = "log10") +
-  scale_y_continuous(name = "Depletion fraction (Qf) after 100 yrs") +
+  scale_x_continuous(name = "Storativity [-]") +
+  scale_y_continuous(name = "Years to dynamic equilibrium") +
   theme_bw()
 
+p_eq_d <- 
+  ggplot(all_summary, aes(y = eq_yrs_constant, x = dist_m)) +
+  geom_point() +
+  scale_x_continuous(name = "Well-stream distance [m]") +
+  scale_y_continuous(name = "Years to dynamic equilibrium") +
+  theme_bw()
+
+p_eq_Tr + p_eq_S + p_eq_d +
+  plot_layout(ncol = 3)
+
+## summarize median by gage
+all_summary_by_gage <-
+  all_summary %>% 
+  group_by(GAGE_ID) %>% 
+  summarize(across(-iter, list(median = median, sd = sd)))
+
+ggplot(all_summary_by_gage, aes(x = Tr_m2d_median, y = eq_yrs_constant_median)) +
+  geom_point() +
+  scale_x_continuous(name = "median Transmissivity [m2/d]", trans = "log10") +
+  scale_y_continuous(name = "median Years to dynamic equilibrium") +
+  theme_bw()
+
+ggplot(all_summary_by_gage, aes(x = Tr_m2d_median, y = Qf_100yrs_constant_median)) +
+  geom_point() +
+  scale_x_continuous(name = "median Transmissivity [m2/d]", trans = "log10") +
+  scale_y_continuous(name = "median Depletion fraction (Qf) after 50 yrs") +
+  theme_bw()
+
+ggplot(all_summary_by_gage, aes(x = S_median, y = eq_yrs_constant_median, color = Tr_m2d_median)) +
+  geom_point() +
+  scale_x_continuous(name = "median Storativity [-]") +
+  scale_y_continuous(name = "median Years to dynamic equilibrium") +
+  scale_color_viridis_c(name = "median Transmissivity [m2/d]", trans = "log10") +
+  theme_bw()
+
+ggplot(all_summary_by_gage, aes(y = Qf_100yrs_constant_median, x = S_median, color = Tr_m2d_median)) +
+  geom_point() +
+  scale_x_continuous(name = "median Storativity [-]") +
+  scale_y_continuous(name = "median Depletion fraction (Qf) after 50 yrs") +
+  scale_color_viridis_c(name = "median Transmissivity [m2/d]", trans = "log10") +
+  theme_bw()
+
+## choose a few sample gages to inspect timeseries: high T high S, high T low S, low T low S, low T high S
+gage_inspect <- c("07144100", "02310747", "11204100", "11204900")
+all_summary_by_gage[all_summary_by_gage$GAGE_ID %in% gage_inspect, ]
+
+# load daily depletion
+for (usgs_id in gage_inspect){
+  daily_depletion_summary <- read_csv(file.path("..", "Data", "depletion", paste0("DepletionFraction_", usgs_id, "_DailySummary.csv"))) %>% 
+    mutate(GAGE_ID = usgs_id)
+  
+  if (usgs_id == gage_inspect[1]){
+    daily_depletion_inspect <- daily_depletion_summary
+  } else {
+    daily_depletion_inspect <- bind_rows(daily_depletion_summary, daily_depletion_inspect)
+  }
+}
+
+daily_depletion_inspect %>% 
+  subset(pumping == "constant" & day <= 25*365) %>% 
+  ggplot(aes(x = day/365)) +
+  geom_ribbon(aes(ymin = Qf25, ymax = Qf75, fill = GAGE_ID), alpha = 0.5) +
+  geom_line(aes(y = Qf50, color = GAGE_ID)) +
+  scale_x_continuous(name = "Year") +
+  scale_y_continuous(name = "Qf, continuous pumping") +
+  labs(title = "Timeseries for selected streams", subtitle = "Line = median, ribbon = 25th to 75th percentile") +
+  theme_bw()
+
+daily_depletion_inspect %>% 
+  subset(pumping == "seasonal" & day <= 25*365) %>% 
+  ggplot(aes(x = day/365)) +
+  geom_ribbon(aes(ymin = Qf25, ymax = Qf75, fill = GAGE_ID), alpha = 0.5) +
+  geom_line(aes(y = Qf50, color = GAGE_ID)) +
+  scale_x_continuous(name = "Year") +
+  scale_y_continuous(name = "Qf, seasonal pumping") +
+  labs(title = "Timeseries for selected streams", subtitle = "Line = median, ribbon = 25th to 75th percentile") +
+  theme_bw()
+  
 ## make maps
 
 # map
