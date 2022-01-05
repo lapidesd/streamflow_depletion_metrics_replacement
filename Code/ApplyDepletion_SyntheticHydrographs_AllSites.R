@@ -53,8 +53,7 @@ gages <- gages[!(gages %in% c("02304510", "03374500", "07311782", "12011500", "0
 ## some parameters
 bound_0 <- 0  # value that any 0 calculation should be replaced with (may set to 0.01 for log plotting)
 pump_Q_fraction <- 0.01  # proportion of mean annual streamflow used for pumping rate (based on withdrawal_fractions.xlsx sheet from John)
-site_output <- F  # write output for each site?
-site_plots <- F   # make plots for each site?
+site_output <- T  # write output for each site?
 
 # loop through gages
 for (usgs_id in gages){
@@ -183,42 +182,11 @@ for (usgs_id in gages){
   
   print(paste0(which(gages == usgs_id), " of ", length(gages), " complete, ", Sys.time()))
   
-  # # ribbon plot: discharge as top, depleted as bottom
-  # if (site_plots){
-  #   daily_depletion_with_Qs %>% 
-  #     subset(Year %in% c(1, 10, 30, 50)) %>% 
-  #     ggplot(aes(x = DOY)) +
-  #     geom_ribbon(aes(ymin = Q_dry_subQs50, ymax = Q_dry), fill = "red", alpha = 0.5) +
-  #     geom_line(aes(y = Q_dry)) +
-  #     scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
-  #     facet_grid(pumping~Year) +
-  #     labs(title = "Dry year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
-  #          subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
-  #   
-  #   daily_depletion_with_Qs %>% 
-  #     subset(Year %in% c(1, 10, 30, 50)) %>% 
-  #     ggplot(aes(x = DOY)) +
-  #     geom_ribbon(aes(ymin = Q_avg_subQs50, ymax = Q_avg), fill = "red", alpha = 0.5) +
-  #     geom_line(aes(y = Q_avg)) +
-  #     scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
-  #     facet_grid(pumping~Year) +
-  #     labs(title = "Average year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
-  #          subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
-  #   
-  #   daily_depletion_with_Qs %>% 
-  #     subset(Year %in% c(1, 10, 30, 50)) %>% 
-  #     ggplot(aes(x = DOY)) +
-  #     geom_ribbon(aes(ymin = Q_wet_subQs50, ymax = Q_wet), fill = "red", alpha = 0.5) +
-  #     geom_line(aes(y = Q_wet)) +
-  #     scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
-  #     facet_grid(pumping~Year) +
-  #     labs(title = "Wet year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
-  #          subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
-  # }
 }
 
 # save summary
 df_summary$year <- factor(df_summary$year, levels = c("dry", "avg", "wet"))
+write_csv(df_summary, file.path("Data", "Depletion", "ApplyDepletion_SyntheticHydrographs_Summary.csv"))
 
 # plot summary
 p_summary_prc0 <-
