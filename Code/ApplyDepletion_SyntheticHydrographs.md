@@ -5,8 +5,8 @@ Apply calculated depletion to the synthetic hydrograph from a gage
 
 This script is intended to apply the fractional streamflow depletion
 (`Qf`) calculated in `CalculateDepletion.R` to long-term hydrologic data
-from a gage. Instead of picking ‘wet’ and ‘average’ years, the
-hydrograph is represented as the Q10 and Q50 for the gage.
+from a gage. Instead of picking ‘dry’, ‘average’, and ‘wet’ years, the
+hydrograph is represented as the Q10, Q50, and Q90 for the gage.
 
 # Set up workspace
 
@@ -193,7 +193,7 @@ ggplot(depletion_plot_years, aes(x = DOY)) +
   scale_x_continuous(name = "DOY", expand = c(0,0)) +
   scale_y_continuous(name = "Daily Qs [m3/s]") +
   facet_grid(pumping~Year) +
-  labs(title = "Daily depletion in selected years by pumping schedule",
+  labs(title = paste0(usgs_id, " Daily depletion in selected years by pumping schedule"),
        subtitle = "Red line/ribbon = median and IQR depletion; dashed black line = pump rate")
 ```
 
@@ -235,7 +235,7 @@ daily_depletion_plot %>%
   scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
   facet_grid(pumping~Year) +
   labs(title = "Dry year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
-       subtitle = "0.01 indicates 0-flow")
+       subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
 ```
 
 ![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
@@ -248,16 +248,20 @@ daily_depletion_plot %>%
   scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
   facet_grid(pumping~Year) +
   labs(title = "Average year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
-       subtitle = "0.01 indicates 0-flow")
+       subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
 ```
 
 ![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
 
-# Questions for Dana/John
+``` r
+daily_depletion_plot %>% 
+  ggplot(aes(x = DOY)) +
+  geom_ribbon(aes(ymin = Q_avg_subQs50, ymax = Q_avg), fill = "red", alpha = 0.5) +
+  geom_line(aes(y = Q_avg)) +
+  scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
+  facet_grid(pumping~Year) +
+  labs(title = "Wet year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
+       subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
+```
 
--   John: are discharge units cms?
--   Does it matter that synthetic hydrographs are so spiky (especially
-    Q90)? Should we run it through a smoothing filter (7-day rolling
-    mean or something)?
--   How are Q10, Q50, Q90 calculated - actual years of data, or fit an
-    ecdf and interpolate?
+![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->

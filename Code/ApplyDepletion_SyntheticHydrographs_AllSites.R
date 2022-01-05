@@ -47,6 +47,15 @@ gages <-
   list.files(pattern = ".csv") %>% 
   str_replace(pattern = ".csv", replacement = "")
 
+# remove sites with issues in CSV files for now
+gages <- gages[!(gages %in% c("02304510", "03374500", "07311782", "12011500", "02310650"))]
+
+## some parameters
+bound_0 <- 0  # value that any 0 calculation should be replaced with (may set to 0.01 for log plotting)
+pump_Q_fraction <- 0.01  # proportion of mean annual streamflow used for pumping rate (based on withdrawal_fractions.xlsx sheet from John)
+site_output <- F  # write output for each site?
+site_plots <- F   # make plots for each site?
+
 # loop through gages
 for (usgs_id in gages){
   #usgs_id <- gages[1]
@@ -55,14 +64,14 @@ for (usgs_id in gages){
   # load calculated depletion
   daily_depletion_summary <- 
     file.path(dir_big_files, paste0("DepletionFraction_", usgs_id, "_DailySummary.csv")) %>% 
-    read_csv() %>% 
+    read_csv(col_types = cols()) %>% 
     mutate(Year = ceiling(day/365),
            DOY = day-(Year-1)*365)
   
   # load historic streamflow percentiles - prepared by John
   daily_streamflow <- 
     file.path(dir_big_files, "complete_years_data_q10_25_50", paste0(usgs_id, ".csv")) %>% 
-    read_csv() %>% 
+    read_csv(col_types = cols()) %>% 
     subset(!(month_nu == 2 & day_nu == 29)) # leap year data averages over a different period - eliminate
   
   # column for DOY
@@ -87,7 +96,6 @@ for (usgs_id in gages){
   #ggplot(subset(daily_depletion_with_Q, Year <= 5), aes(x = day, y = Q_dry)) + geom_line()
   
   ## set pump rate
-  pump_Q_fraction <- 0.2  # 20% of mean annual streamflow (based on withdrawal_fractions.xlsx sheet from John)
   pump_rate_cms <- mean(daily_streamflow$mean_va)*pump_Q_fraction  # pump rate for constant pumping
   pump_vol_m3 <- pump_rate_cms*365*24*60*60
   seasonal_pump_days <- length(seq(yday(ymd("2021-05-01")), yday(ymd("2021-09-30"))))
@@ -127,14 +135,116 @@ for (usgs_id in gages){
   for (Q in Q_options){
     for (Qs in Qs_options){
       varname <- paste0(Q, "_sub", Qs)
-      daily_depletion_with_Qs$new <- sub0(daily_depletion_with_Qs, Q, Qs, bound = 0.01) # use 0.01 for log plotting
+      daily_depletion_with_Qs$new <- sub0(daily_depletion_with_Qs, Q, Qs, bound = bound_0)
       names(daily_depletion_with_Qs)[names(daily_depletion_with_Qs) == "new"] <- varname
     }
   }
   
   ## subset to just data you want to save
+  df_depleted_flow <-
+    daily_depletion_with_Qs %>% 
+    dplyr::select(day, pumping, 
+                  Q_dry, Q_dry_subQs5, Q_dry_subQs25, Q_dry_subQs50, Q_dry_subQs75,Q_dry_subQs95,
+                  Q_avg, Q_avg_subQs5, Q_avg_subQs25, Q_avg_subQs50, Q_avg_subQs75,Q_avg_subQs95,
+                  Q_wet, Q_wet_subQs5, Q_wet_subQs25, Q_wet_subQs50, Q_wet_subQs75,Q_wet_subQs95)
+  df_depleted_flow[, 3:dim(df_depleted_flow)[2]] <-
+    round(df_depleted_flow[, 3:dim(df_depleted_flow)[2]], 3)
+  
+  if (site_output){
+    write_csv(df_depleted_flow, file.path(dir_big_files, "ApplyDepletion_SyntheticHydrographs", paste0("DepletedFlow_", usgs_id, ".csv")))
+  }
   
   ## summary statistics
+  # want to know: day for first 0-flow, percent of days with 0-flow
+  df_site_summary <- 
+    tibble(usgs_id = usgs_id,
+           year = rep(c("dry", "avg", "wet"), each = 4),
+           pumping = rep(c("constant", "constant", "seasonal", "seasonal"), times = 3),
+           metric = rep(c("first0day", "prc0"), times = 6),
+           value = c(min(subset(df_depleted_flow, pumping == "constant" & Q_dry_subQs50 == bound_0)$day),
+                     length(subset(df_depleted_flow, pumping == "constant" & Q_dry_subQs50 == bound_0)$day)/max(df_depleted_flow$day),
+                     min(subset(df_depleted_flow, pumping == "seasonal" & Q_dry_subQs50 == bound_0)$day),
+                     length(subset(df_depleted_flow, pumping == "seasonal" & Q_dry_subQs50 == bound_0)$day)/max(df_depleted_flow$day),
+                     min(subset(df_depleted_flow, pumping == "constant" & Q_avg_subQs50 == bound_0)$day),
+                     length(subset(df_depleted_flow, pumping == "constant" & Q_avg_subQs50 == bound_0)$day)/max(df_depleted_flow$day),
+                     min(subset(df_depleted_flow, pumping == "seasonal" & Q_avg_subQs50 == bound_0)$day),
+                     length(subset(df_depleted_flow, pumping == "seasonal" & Q_avg_subQs50 == bound_0)$day)/max(df_depleted_flow$day),
+                     min(subset(df_depleted_flow, pumping == "constant" & Q_wet_subQs50 == bound_0)$day),
+                     length(subset(df_depleted_flow, pumping == "constant" & Q_wet_subQs50 == bound_0)$day)/max(df_depleted_flow$day),
+                     min(subset(df_depleted_flow, pumping == "seasonal" & Q_wet_subQs50 == bound_0)$day),
+                     length(subset(df_depleted_flow, pumping == "seasonal" & Q_wet_subQs50 == bound_0)$day)/max(df_depleted_flow$day))
+    )
   
+  if (usgs_id == gages[1]){
+    df_summary <- df_site_summary
+  } else {
+    df_summary <- bind_rows(df_summary, df_site_summary)
+  }
+  
+  print(paste0(which(gages == usgs_id), " of ", length(gages), " complete, ", Sys.time()))
+  
+  # # ribbon plot: discharge as top, depleted as bottom
+  # if (site_plots){
+  #   daily_depletion_with_Qs %>% 
+  #     subset(Year %in% c(1, 10, 30, 50)) %>% 
+  #     ggplot(aes(x = DOY)) +
+  #     geom_ribbon(aes(ymin = Q_dry_subQs50, ymax = Q_dry), fill = "red", alpha = 0.5) +
+  #     geom_line(aes(y = Q_dry)) +
+  #     scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
+  #     facet_grid(pumping~Year) +
+  #     labs(title = "Dry year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
+  #          subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
+  #   
+  #   daily_depletion_with_Qs %>% 
+  #     subset(Year %in% c(1, 10, 30, 50)) %>% 
+  #     ggplot(aes(x = DOY)) +
+  #     geom_ribbon(aes(ymin = Q_avg_subQs50, ymax = Q_avg), fill = "red", alpha = 0.5) +
+  #     geom_line(aes(y = Q_avg)) +
+  #     scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
+  #     facet_grid(pumping~Year) +
+  #     labs(title = "Average year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
+  #          subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
+  #   
+  #   daily_depletion_with_Qs %>% 
+  #     subset(Year %in% c(1, 10, 30, 50)) %>% 
+  #     ggplot(aes(x = DOY)) +
+  #     geom_ribbon(aes(ymin = Q_wet_subQs50, ymax = Q_wet), fill = "red", alpha = 0.5) +
+  #     geom_line(aes(y = Q_wet)) +
+  #     scale_y_continuous(name = "Daily Qs [m3/s]", trans = "log10") +
+  #     facet_grid(pumping~Year) +
+  #     labs(title = "Wet year discharge (black) and depletion (ribbon) for selected years and pumping schedules",
+  #          subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
+  # }
 }
 
+# save summary
+df_summary$year <- factor(df_summary$year, levels = c("dry", "avg", "wet"))
+
+# plot summary
+p_summary_prc0 <-
+  df_summary %>% 
+  subset(metric == "prc0") %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(breaks = seq(0, 1, 0.1)) +
+  facet_grid(pumping ~ year) +
+  scale_x_continuous(name = "Percent of 50 year simulation with 0 flow") +
+  scale_y_continuous(name = "Number of gages") +
+  labs(title = "Time gages are dry for median depletion scenario",
+       subtitle = paste0("Pumping at ", 100*pump_Q_fraction, "% mean annual flow"))
+
+p_summary_first0day <-
+  df_summary %>% 
+  subset(metric == "first0day") %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(breaks = seq(1, 36501, 365)) +
+  facet_grid(pumping ~ year) +
+  scale_x_continuous(name = "Day of simulation with first 0 flow") +
+  scale_y_continuous(name = "Number of gages") +
+  labs(title = "Timing of drying for median depletion scenario",
+       subtitle = paste0("Pumping at ", 100*pump_Q_fraction, "% mean annual flow"))
+
+p_combo <-
+  (p_summary_prc0 + p_summary_first0day) +
+  plot_layout(ncol = 1)
+ggsave(file.path("Figures", paste0("ApplyDepletion_SyntheticHydrographs_Summary_pump", 100*pump_Q_fraction, "Qmean.png")),
+       p_combo, width = 190, height = 300, units = "mm")
