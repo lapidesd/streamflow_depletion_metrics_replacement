@@ -19,7 +19,7 @@ library(dataRetrieval)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
 # directory to keep stuff that is too big for GitHub
-dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics/data"
+dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics_LapidesEtAl/data"
 
 ```
 

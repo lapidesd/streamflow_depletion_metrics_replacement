@@ -11,7 +11,7 @@ library(dataRetrieval)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
 # directory to keep stuff that is too big for GitHub
-dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics/data"
+dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics_LapidesEtAl/data"
 
 # categorical color palette from https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
 col.cat.grn <- "#3cb44b"   # green

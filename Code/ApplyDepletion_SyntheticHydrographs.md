@@ -19,7 +19,7 @@ library(dataRetrieval)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
 # directory to keep stuff that is too big for GitHub
-dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics/data"
+dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics_LapidesEtAl/data"
 
 ## color palettes
 # categorical color palette from https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
@@ -134,7 +134,7 @@ daily_DAW %>%
   ggplot(aes(x = DOY, y = discharge, color = name)) +
   geom_line() +
   scale_x_continuous(name = "DOY", expand = c(0,0)) +
-  scale_y_log10(name = "Discharge [???cms???]") +
+  scale_y_log10(name = "Discharge [cms]") +
   scale_color_manual(name = "Year", 
                      values = c("Q_avg" = "black", "Q_dry" = col.cat.red, "Q_wet" = col.cat.blu),
                      labels = c("Q_avg" = "Average", "Q_dry" = "Dry", "Q_wet" = "Wet"))
@@ -153,7 +153,7 @@ daily_depletion_with_Q <- left_join(daily_depletion_summary, daily_DAW, by = "DO
 
 ## set pump rate
 pump_Q_fraction <- 0.2  # 20% of mean annual streamflow (based on withdrawal_fractions.xlsx sheet from John)
-pump_rate_cms <- mean(daily_streamflow$mean_va)*pump_Q_fraction  # pump rate for constant pumping
+pump_rate_cms <- mean(daily_DAW$Q_avg)*pump_Q_fraction  # pump rate for constant pumping
 pump_vol_m3 <- pump_rate_cms*365*24*60*60
 seasonal_pump_days <- length(seq(yday(ymd("2021-05-01")), yday(ymd("2021-09-30"))))
 pump_rate_cms_seasonal <- pump_vol_m3/(seasonal_pump_days*24*60*60)
