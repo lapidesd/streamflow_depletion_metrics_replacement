@@ -20,7 +20,7 @@ library(patchwork)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
 # directory to keep stuff that is too big for GitHub
-dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics/data"
+dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics_LapidesEtAl/data"
 
 ```
 
@@ -137,7 +137,7 @@ ggplot(sf_gages, aes(color = Qf_100yrs_constant_median)) +
 
 ```{r}
 ## choose  sample gages: high T high S, high T low S, low T low S, low T high S
-gage_inspect <- c("07144100", "02310747", "11204100", "11204900")
+gage_inspect <- c("02310747", "11204100", "11204900")
 all_summary_by_gage[all_summary_by_gage$GAGE_ID %in% gage_inspect, ]
 
 # load daily depletion

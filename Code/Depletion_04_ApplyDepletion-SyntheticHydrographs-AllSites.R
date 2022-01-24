@@ -1,6 +1,8 @@
-## ApplyDepletion_SyntheticHydrographs_AllSites.R
+## Depletion_04_ApplyDepletion_SyntheticHydrographs_AllSites.R
 # This script calculates depleted streamflow for all gages.
 # It is illustrated for 1 gage in ApplyDepletion_SyntheticHydrographs.Rmd
+# This will be run for all sites to determine the appropriate pumping volume.
+# Then, a separate script will produce the output of depleted flow time series.
 
 ## prep workspace
 # load packages
@@ -47,13 +49,10 @@ gages <-
   list.files(pattern = ".csv") %>% 
   str_replace(pattern = ".csv", replacement = "")
 
-# remove sites with issues in CSV files for now
-gages <- gages[!(gages %in% c("02304510", "03374500", "07311782", "12011500", "02310650"))]
-
 ## some parameters
 bound_0 <- 0  # value that any 0 calculation should be replaced with (may set to 0.01 for log plotting)
-pump_Q_fraction <- 0.01  # proportion of mean annual streamflow used for pumping rate (based on withdrawal_fractions.xlsx sheet from John)
-site_output <- T  # write output for each site?
+pump_Q_fraction <- 0.05  # proportion of mean annual streamflow used for pumping rate (based on withdrawal_fractions.xlsx sheet from John)
+site_output <- F  # write output for each site?
 
 # loop through gages
 for (usgs_id in gages){
@@ -95,7 +94,7 @@ for (usgs_id in gages){
   #ggplot(subset(daily_depletion_with_Q, Year <= 5), aes(x = day, y = Q_dry)) + geom_line()
   
   ## set pump rate
-  pump_rate_cms <- mean(daily_streamflow$mean_va)*pump_Q_fraction  # pump rate for constant pumping
+  pump_rate_cms <- mean(daily_DAW$Q_avg)*pump_Q_fraction  # pump rate for constant pumping
   pump_vol_m3 <- pump_rate_cms*365*24*60*60
   seasonal_pump_days <- length(seq(yday(ymd("2021-05-01")), yday(ymd("2021-09-30"))))
   pump_rate_cms_seasonal <- pump_vol_m3/(seasonal_pump_days*24*60*60)

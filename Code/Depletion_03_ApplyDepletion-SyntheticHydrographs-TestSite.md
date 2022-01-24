@@ -112,7 +112,7 @@ daily_streamflow %>%
   scale_y_log10(name = "Discharge [???cms???]")
 ```
 
-![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 # Select and plot dry, average, and wet year
 
@@ -140,7 +140,7 @@ daily_DAW %>%
                      labels = c("Q_avg" = "Average", "Q_dry" = "Dry", "Q_wet" = "Wet"))
 ```
 
-![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 # Calculate volumetric depletion
 
@@ -197,7 +197,7 @@ ggplot(depletion_plot_years, aes(x = DOY)) +
        subtitle = "Red line/ribbon = median and IQR depletion; dashed black line = pump rate")
 ```
 
-![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 # apply volumetric depletion to dry, avg, wet years
 
@@ -238,7 +238,7 @@ daily_depletion_plot %>%
        subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
 ```
 
-![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ``` r
 daily_depletion_plot %>% 
@@ -251,7 +251,7 @@ daily_depletion_plot %>%
        subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
 ```
 
-![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
+![](Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
 
 ``` r
 daily_depletion_plot %>% 
@@ -264,4 +264,4 @@ daily_depletion_plot %>%
        subtitle = paste0(usgs_id, "; 0.01 indicates 0-flow"))
 ```
 
-![](ApplyDepletion_SyntheticHydrographs_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->
+![](Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->

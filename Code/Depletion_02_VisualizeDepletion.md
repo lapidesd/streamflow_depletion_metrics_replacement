@@ -17,7 +17,7 @@ library(patchwork)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
 # directory to keep stuff that is too big for GitHub
-dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics/data"
+dir_big_files <- "C:/Users/samzipper/OneDrive - The University of Kansas/Research/StreamflowDepletion/DepletionMetrics_LapidesEtAl/data"
 ```
 
 # Load and compile data
@@ -87,7 +87,7 @@ p_eq_Tr + p_eq_S + p_eq_d +
   plot_layout(ncol = 3)
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 # plot summary of median by gage
 
@@ -106,7 +106,7 @@ ggplot(all_summary_by_gage, aes(x = Tr_m2d_median, y = eq_yrs_constant_median)) 
   theme_bw()
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ``` r
 ggplot(all_summary_by_gage, aes(x = Tr_m2d_median, y = Qf_100yrs_constant_median)) +
@@ -116,7 +116,7 @@ ggplot(all_summary_by_gage, aes(x = Tr_m2d_median, y = Qf_100yrs_constant_median
   theme_bw()
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-2.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-2.png)<!-- -->
 
 ``` r
 ggplot(all_summary_by_gage, aes(x = S_median, y = eq_yrs_constant_median, color = Tr_m2d_median)) +
@@ -127,7 +127,7 @@ ggplot(all_summary_by_gage, aes(x = S_median, y = eq_yrs_constant_median, color 
   theme_bw()
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-3.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-3.png)<!-- -->
 
 ``` r
 ggplot(all_summary_by_gage, aes(y = Qf_100yrs_constant_median, x = S_median, color = Tr_m2d_median)) +
@@ -138,7 +138,7 @@ ggplot(all_summary_by_gage, aes(y = Qf_100yrs_constant_median, x = S_median, col
   theme_bw()
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-4.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-4.png)<!-- -->
 
 ``` r
 ## maps
@@ -151,7 +151,7 @@ ggplot(sf_gages, aes(color = eq_yrs_constant_median)) +
   theme(legend.position = "bottom")
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-5.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-5.png)<!-- -->
 
 ``` r
 ggplot(sf_gages, aes(color = Qf_100yrs_constant_median)) +
@@ -161,23 +161,22 @@ ggplot(sf_gages, aes(color = Qf_100yrs_constant_median)) +
   theme(legend.position = "bottom")
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-6.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-4-6.png)<!-- -->
 
 # inspect timeseries of selected streams
 
 ``` r
 ## choose  sample gages: high T high S, high T low S, low T low S, low T high S
-gage_inspect <- c("07144100", "02310747", "11204100", "11204900")
+gage_inspect <- c("02310747", "11204100", "11204900")
 all_summary_by_gage[all_summary_by_gage$GAGE_ID %in% gage_inspect, ]
 ```
 
-    ## # A tibble: 4 x 13
+    ## # A tibble: 3 x 13
     ##   GAGE_ID  dist_m_median dist_m_sd S_median   S_sd Tr_m2d_median Tr_m2d_sd
     ##   <chr>            <dbl>     <dbl>    <dbl>  <dbl>         <dbl>     <dbl>
     ## 1 02310747          287.      277.     0.06 0.0574        720.      362.  
-    ## 2 07144100          287.      277.     0.28 0.0664        545.      154.  
-    ## 3 11204100          287.      277.     0.01 0               1.18      3.67
-    ## 4 11204900          287.      277.     0.22 0.101           1.25     26.3 
+    ## 2 11204100          287.      277.     0.01 0               1.18      3.67
+    ## 3 11204900          287.      277.     0.22 0.101           1.25     26.3 
     ## # ... with 6 more variables: eq_yrs_constant_median <dbl>,
     ## #   eq_yrs_constant_sd <dbl>, eq_yrs_seasonal_median <dbl>,
     ## #   eq_yrs_seasonal_sd <dbl>, Qf_100yrs_constant_median <dbl>,
@@ -230,17 +229,6 @@ for (usgs_id in gage_inspect){
     ## i Use `spec()` to retrieve the full column specification for this data.
     ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
 
-    ## Rows: 36500 Columns: 11
-
-    ## -- Column specification --------------------------------------------------------
-    ## Delimiter: ","
-    ## chr  (1): pumping
-    ## dbl (10): day, Qfmean, Qfsd, Qfmin, Qf5, Qf25, Qf50, Qf75, Qf95, Qfmax
-
-    ## 
-    ## i Use `spec()` to retrieve the full column specification for this data.
-    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
-
 ``` r
 daily_depletion_inspect %>% 
   subset(pumping == "constant" & day <= 25*365) %>% 
@@ -253,7 +241,7 @@ daily_depletion_inspect %>%
   theme_bw()
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ``` r
 daily_depletion_inspect %>% 
@@ -267,4 +255,4 @@ daily_depletion_inspect %>%
   theme_bw()
 ```
 
-![](VisualizeDepletion_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
+![](Depletion_02_VisualizeDepletion_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
