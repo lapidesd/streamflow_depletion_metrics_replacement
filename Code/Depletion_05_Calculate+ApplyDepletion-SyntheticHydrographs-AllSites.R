@@ -9,6 +9,7 @@ library(lubridate)
 library(tidyverse)
 library(patchwork)
 library(dataRetrieval)
+library(streamDepletr)
 options(dplyr.summarise.inform=F)   # suppress summarize info
 
 ## directory to keep stuff that is too big for GitHub
@@ -132,7 +133,6 @@ for (usgs_id in gages){
   daily_streamflow <- 
     file.path(dir_big_files, "complete_years_data_q10_25_50", paste0(usgs_id, ".csv")) %>% 
     read_csv(col_types = cols()) %>% 
-    subset(!(month_nu == 2 & day_nu == 29)) %>%  # leap year data averages over a different period - eliminate
     mutate(DOY = seq(1, 365))
   
   # create dry/avg/wet data frames
@@ -205,4 +205,6 @@ for (usgs_id in gages){
   write_csv(Q_wet_constant, file.path(dir_big_files, "ApplyDepletion_SyntheticHydrographs", paste0("DepletedQ_Wet_Constant_", usgs_id, ".csv")))
   write_csv(Q_wet_seasonal, file.path(dir_big_files, "ApplyDepletion_SyntheticHydrographs", paste0("DepletedQ_Wet_Seasonal_", usgs_id, ".csv")))
   
+  # status update
+  print(paste0(usgs_id, ", ", which(gages==usgs_id), " of ", length(gages), " complete, ", Sys.time()))
 }

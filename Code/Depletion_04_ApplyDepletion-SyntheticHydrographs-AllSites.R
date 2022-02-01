@@ -70,10 +70,7 @@ for (usgs_id in gages){
   daily_streamflow <- 
     file.path(dir_big_files, "complete_years_data_q10_25_50", paste0(usgs_id, ".csv")) %>% 
     read_csv(col_types = cols()) %>% 
-    subset(!(month_nu == 2 & day_nu == 29)) # leap year data averages over a different period - eliminate
-  
-  # column for DOY
-  daily_streamflow$DOY <- seq(1, 365)
+    mutate(DOY = seq(1, 365))
   
   ## select dry, avg, wet year
   # column names corresponding to dry, average, and wet

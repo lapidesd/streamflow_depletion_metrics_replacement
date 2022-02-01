@@ -80,13 +80,13 @@ daily_depletion_summary <-
 daily_streamflow <- 
   file.path(dir_big_files, "complete_years_data_q10_25_50", paste0(usgs_id, ".csv")) %>% 
   read_csv() %>% 
-  subset(!(month_nu == 2 & day_nu == 29)) # leap year data averages over a different period - eliminate
+  mutate(DOY = seq(1, 365))
 ```
 
     ## New names:
     ## * `` -> ...1
 
-    ## Rows: 366 Columns: 26
+    ## Rows: 365 Columns: 26
 
     ## -- Column specification --------------------------------------------------------
     ## Delimiter: ","
@@ -99,9 +99,6 @@ daily_streamflow <-
     ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
 
 ``` r
-# column for DOY
-daily_streamflow$DOY <- seq(1, 365)
-
 # plot all percentiles
 daily_streamflow %>% 
   select(DOY, starts_with("p"), -parameter_cd) %>% 
