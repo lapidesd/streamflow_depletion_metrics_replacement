@@ -12,12 +12,23 @@ Programs included in the 'Code' directory of this repository:
 
 - find_stations.ipynb: a jupyter notebook that identifies the set of GAGESII stations with continuous long-term stream temperature monitoring.
 
-- end-member-thermo-model.ipynb: a jupyter notebook that evaluates the performance of an end-member mixing model for stream
-temperature at GAGESII sites with at least 15 years of continuous stream temperature modeling. Hydrograph separation is performed
-using the method described by Eckhardt (2005) as implemented in the [hydro python package](https://github.com/hydrogeog/hydro). Groundwater 
-temperature is modeled as a 120-day rolling average of air temperature (min daily air temperature in the summer, max daily air temperature in the winter)
-using [Gridmet data](http://www.climatologylab.org/gridmet.html) (Abatzoglou, 2013). Maximum (minimum) surface water temperature is modeled as 
-maximum (minimum) daily air temeprature. Mean surface water temperature is modeled as the 2-day rolling mean of the daily mean air temperature.
+- Depletion_01_CalculateDepletionFraction.Rmd: R script that calculates fractional streamflow depletion using the Glover model
+
+- Depletion_02_VisualizeDepletion.Rmd: R script to visualize output from Depletion_01_CalculateDepletionFraction.Rmd
+
+- Depletion_03_ApplyDepletion-SyntheticHydrographs-TestSite.Rmd: R script to apply fraction streamflow depletion calculated in Depletion_01_CalculateDepletionFraction.Rmd to a long-term streamflow record.
+
+- Depletion_04_ApplyDepletion-SyntheticHydrographs-AllSites.R: R script to calculate depleted streamflow for an example sites with parameter uncertainty
+
+- Depletion_05_Calculate+ApplyDepletion-SyntheticHydrographs-AllSites.R: R script to calculate depleted streamflow at all study sites with parameter uncertainty
+
+- Depletion_06_CompileEquilibrationTimeData.R: R script to provide information about time to equilibrium for depletionmodel with different parameter combinations
+
+- aquifer_params.ipynb: a jupyter notebook that ingests data sources and estimates aquifer parameters for study sites
+
+- calculate_streamflow_volume_metrics_071322.R: an R script that calculates streamflow metrics for all sites for measured and synthetically depleted timeseries
+
+- metric_outcomes_publish.ipynb: a jupyter notebook that reads in calculated metrics on measured and synthetically depleted timeseries and generates manuscript figures
 
 Data included in the 'Data' directory of this repository:
 
