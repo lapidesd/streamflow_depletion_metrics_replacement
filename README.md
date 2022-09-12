@@ -1,5 +1,7 @@
 # streamflow_depletion_metrics
 
+[![DOI](https://zenodo.org/badge/390171336.svg)](https://zenodo.org/badge/latestdoi/390171336)
+
 Changing precipitation patterns and increasing human reliance on groundwater resources drive changes in streamflow patterns and persistence. 
 While streamflow depletion has wide-ranging effects for aquatic ecosystems and human populations, detecting and predicting the impacts of
 streamflow depletion can be very difficult. Several low-flow metrics have been used in management to assess potential impacts of groundwater
