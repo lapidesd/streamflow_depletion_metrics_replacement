@@ -32,7 +32,9 @@ Programs included in the 'Code' directory of this repository:
 
 Data included in the 'Data' directory of this repository:
 
-- end_member_performance1.csv: End-member mixing model performance at each GAGESII station with at least 15 years of continuous temperature data. Performance is measured by NSE, KGE, RMSE, and pbias.
+- JasechkoEtAl_Fig2Data: Groundwater pumping data used to support our estimates of 'realistic' groundwater pumping
+- data_publish: calculated metric data for annual and seasonal metrics at all sites
+- depletion: csv data summarizing modeled streamflow depletion at each site with parameter uncertainty
 
 - gridmet_tempsites: a directory containing Gridmet data at each GAGESII station with at least 15 years of continuous temperature data.
 
@@ -52,9 +54,16 @@ Data included in the 'Data' directory of this repository:
 
      - US_state_outline: directory containing a shapfile of the United States with states delineated
 
+- transmissivity_data: transmissivity estimated by site
+- GAGESII_aquifer_params.csv: Aquifer parameters for GAGESII sites
+- GLHYMPS_Porosity_by_gauges.csv: Aquifer parameters estimated from GLHYMPS
+- gagesII_basin_params1.csv and gagesII_basin_params2.csv: Subset of GAGES-II site information used for random forest models (Falcone et al., 2011)
+- median_streamflow.csv: Median streamflow at each site across period of record
+- transmissivity_by_gauge_all_points.csv: Transmissivity estimated at each study site
+
 
 
 # References
 Abatzoglou, J. T. (2013), Development of gridded surface meteorological data for ecological applications and modelling. Int. J. Climatol., 33: 121–131.
 
-Eckhardt, Klaus. "How to construct recursive digital filters for baseflow separation." Hydrological Processes: An International Journal 19.2 (2005): 507-515.
+Falcone, J. A. (2011). GAGES-II: Geospatial Attributes of Gages for Evaluating Streamflow (USGS Unnumbered Series). Reston, VA: U.S. Geological Survey. Retrieved from http://pubs.er.usgs.gov/publication/70046617
