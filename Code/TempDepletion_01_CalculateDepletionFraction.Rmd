@@ -1,0 +1,170 @@
+---
+title: "Depletion calculations for temperature paper"
+output: rmarkdown::github_document
+---
+
+# Overview
+
+This script is intended to calculate fractional streamflow depletion (`Qf`) using the Glover model. 
+`Qf` is depletion as a fraction of pumping rate. To obtain volumetric streamflow depletion (`Qs`), multiply `Qf` by the pumping rate (`Qw`). `Qs = Qf*Qw`
+
+# Set up workspace
+
+```{r echo = T, results = 'hide', message = F, warning = F}
+
+## load packages
+library(streamDepletr)
+library(lubridate)
+library(tidyverse)
+library(sf)
+library(patchwork)
+options(dplyr.summarise.inform=F)   # suppress summarize info
+
+```
+
+# Prep input data for model
+
+```{r}
+
+## times to test
+n_yrs <- 50
+times <- seq(1, 365*n_yrs, 1)
+
+# for seasonal pumping, start/stop times
+times_start <- seq(yday(ymd("2021-05-01")), yday(ymd("2021-05-01"))+365*n_yrs, 365)
+times_stop <- seq(yday(ymd("2021-09-30")), yday(ymd("2021-09-30"))+365*n_yrs, 365)
+
+## load well-stream distances
+jsko_files <- list.files(file.path("..", "Data", "JasechkoEtAl_Fig2Data"), pattern = ".csv")
+for (f in jsko_files){
+  # compile all individual states into one data frame
+  state <- gsub(".csv", "", f)
+  jsko_state_data <- 
+    file.path("..", "Data", "JasechkoEtAl_Fig2Data", f) %>% 
+    read_csv() %>% 
+    mutate(State = state)
+  
+  if (f == jsko_files[1]){
+    jsko_all_states <- jsko_state_data
+  } else {
+    jsko_all_states <- bind_rows(jsko_all_states, jsko_state_data)
+  }
+}
+
+## define transmissivity parameters
+# from Zell & Sanford (2020) Fig 6f: log(Ts) ~normally distributed from 0-3 m2/d
+# use mean of 1.5 and sd of 0.75
+logTmean <- 1.5
+logTsd <- 0.75
+
+## define storativity parameters
+# from Gleeson et al. (2014) Table 1: unconsolidated and sedimentary porosities range from 0.12 to 0.28
+# use mean of 0.2 and sd of 0.04
+Smean <- 0.2
+Ssd <- 0.04
+
+```
+
+# Sample 100 parameter sets
+
+```{r echo = T, message = F, warning = F}
+
+set.seed(1)
+n_iter <- 100
+gage_d_sample <- sample(jsko_all_states$NearestFlowlineDistance_m, size = n_iter)
+gage_S_sample <- rnorm(n_iter, mean = Smean, sd = Ssd)
+gage_logT_sample <- rnorm(n_iter, mean = logTmean, sd = logTsd)
+
+# combine into data frame
+df_sample <- data.frame(iter = 1:n_iter,
+                        d_m = gage_d_sample,
+                        S = gage_S_sample,
+                        logT_m2d = gage_logT_sample)
+
+# plot
+df_sample |> 
+  pivot_longer(-iter, names_to = "parameter", values_to = "value") |> 
+  ggplot(aes(x = value)) +
+  stat_ecdf() +
+  facet_wrap(~parameter, scales = "free")
+
+```
+
+# Depletion calculation for each gage
+
+```{r echo = T, message = F, warning = F}
+
+## loop through each parameter set
+for (n in 1:n_iter){
+  
+  ## loop through iterations and calculate depletion
+    ## get parameters for this sample
+    n_d <- round(gage_d_sample[n], 3)
+    n_S <- round(gage_S_sample[n], 3)
+    n_Tr <- 10^gage_logT_sample[n]
+    
+    ## calculate depletion
+    # constant pumping
+    Qf_constant <- glover(t = times, d = n_d, S = n_S, Tr = n_Tr)
+    # plot(times, Qf_constant)
+    
+    # seasonal pumping (may-sept)
+    Qf_seasonal <- intermittent_pumping(t = times, starts = times_start, stops = times_stop, rates = 1, 
+                                        method = "glover", d = n_d, S = n_S, Tr = n_Tr)
+    # plot(times, Qf_seasonal)
+    
+    ## summarize data
+    daily_iter_depletion <- tibble(iter = n,
+                                   day = times,
+                                   Qf_constant = round(Qf_constant, 3),
+                                   Qf_seasonal = round(Qf_seasonal, 3))
+          
+    ## compile data frame
+    if (n == 1){
+      daily_depletion <- daily_iter_depletion
+    } else {
+      daily_depletion <- bind_rows(daily_depletion, daily_iter_depletion)
+    }
+  
+  ## status update
+  print(paste0(n, " of ", n_iter, " complete, ", Sys.time()))
+}
+
+```
+
+# Plot summaries of depletion
+
+```{r echo = T, message = F, warning = F}
+# calculate depletion after 10.5 years (during pumping season)
+df_10yr <- 
+  daily_depletion |> 
+  subset(day == round(365*10.5)) |> 
+  left_join(df_sample, by = "iter")
+
+# distribution of Qf
+ggplot(df_10yr, aes(x = Qf_constant)) +
+  geom_histogram()
+
+ggplot(df_10yr, aes(x = Qf_seasonal)) +
+  geom_histogram()
+
+# Qf vs parameters
+ggplot(df_10yr, aes(x = Qf_constant, y = d_m)) +
+  geom_point()
+
+ggplot(df_10yr, aes(x = Qf_constant, y = S)) +
+  geom_point()
+
+ggplot(df_10yr, aes(x = Qf_constant, y = logT_m2d)) +
+  geom_point()
+
+```
+
+# save output
+
+```{r echo = T, message = F, warning = F}
+## save output - I will not upload these to GitHub since file size is large
+write_csv(daily_depletion, file.path("..", "Data", "TempDepletion_DailyQf.csv"))
+write_csv(df_sample, file.path("..", "Data", "TempDepletion_ParameterSample.csv"))
+```
+  
